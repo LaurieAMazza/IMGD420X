@@ -1,4 +1,8 @@
-## Welcome to GitHub Pages
+# IMGD 420X: Laurie Mazza
+
+##[Assignment 2](https://LaurieAMazza.github.io/IMGD420X/)
+##[Assignment 3](https://LaurieAMazza.github.io/IMGD420X/)
+##[Assignment 4](https://LaurieAMazza.github.io/IMGD420X/)
 
 You can use the [editor on GitHub](https://github.com/LaurieAMazza/IMGD420X/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
 
