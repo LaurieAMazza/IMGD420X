@@ -1,6 +1,6 @@
 # IMGD 420X: Laurie Mazza
 
-##[Assignment 2](https://LaurieAMazza.github.io/IMGD420X/)
+##[Assignment 2](https://LaurieAMazza.github.io/IMGD420X/Assignment2/)
 ##[Assignment 3](https://LaurieAMazza.github.io/IMGD420X/)
 ##[Assignment 4](https://LaurieAMazza.github.io/IMGD420X/)
 
