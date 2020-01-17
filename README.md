@@ -1,4 +1,6 @@
-# Laurie Mazza
+---
+title: Test
+---
 
 ## [Assignment 2](https://LaurieAMazza.github.io/IMGD420X/Assignment2.html)
 Shader Live Coding
