@@ -4,11 +4,11 @@
 For this project, my original goal was to recreate one effect I achieved when using the Vidot along with combining it with part of another effect I achieved using the Vidot. The main effect I was trying to recreate shown in the first video below has lines scrolling up the screen and changing color and shape to the music (the music cannot be heard has there was no audio output. I believe the song was One More Time). Shown in the second video is another effect I was able to create with the Vidot. My idea for this project was to take the bouncing effect from this and combine it with the first effect and video input. While working towards this goal I started to create interesting color waves on top of the video input. I enjoyed the way the colors would blend together when moving so I decided to explore this effect more. Having time and noise both impact the wave movement created an interesting flow. The video underneath still seemed boring with this effect so I wanted to give it a blur to make it more interesting. I decide to have the blur impacted by not only the tangent of the time but also the y-direction be controlled by the audio input. This along with inversion creates an interesting shake effect at certain points of some songs.
 
 ### Vidot Videos and Pictures
-<iframe width="560" height="315" src="https://www.youtube.com/embed/evTrB_bSeTQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/olD0a2LnAvc" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 <iframe width="560" height="315" src="https://www.youtube.com/embed/evTrB_bSeTQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ### Shader Video
-<iframe width="560" height="315" src="https://www.youtube.com/embed/evTrB_bSeTQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/IMKyM8-nSSM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ### Code
 ```
