@@ -29,6 +29,7 @@
   uniform sampler2D state;
   uniform vec2 scale;
   uniform float f;
+  uniform float k;
 
   void main() {
     vec4 color = texture2D(state, gl_FragCoord.xy / scale);
@@ -41,8 +42,10 @@
   uniform sampler2D state;
   uniform vec2 scale;
   uniform float f;
+  uniform float k;
+
   //float f=.0545, k=.062, dA = 1., dB = 0.; // coral preset
-  float k = .0635, dA = 1., dB = .5;
+  float dA = 1., dB = .5;
 
   vec2 get(int x, int y) {
     return texture2D( state, ( gl_FragCoord.xy + vec2(x, y) ) / scale ).rg;
@@ -87,7 +90,8 @@
   }
   void main() {
     vec2 nextState = run();
-    gl_FragColor = vec4( nextState.r, nextState.g, 0., 1. );
+    vec4 Color = vec4( nextState.r, nextState.g, 0., 1. );
+    gl_FragColor = Color;
   }
 </script>
 
@@ -98,6 +102,7 @@
 
     var guiVars = function(){
         this.f = 0.0457;
+        this.k = 0.0635
     }
 
     window.onload = function() {
@@ -144,7 +149,8 @@
 
         guivar = new guiVars();
         var gui = new dat.GUI();
-        gui.add(guivar, 'f', 0.03, 0.099)
+        gui.add(guivar, 'f', 0.03, 0.079)
+        gui.add(guivar, 'k', 0.059, 0.066)
 
         // create pointer to vertex array and uniform sharing simulation size
         const position = gl.getAttribLocation( programRender, 'a_position' )
@@ -257,6 +263,12 @@
             let uF = gl.getUniformLocation( programRender, 'f' )
             // send value from CPU to GPU pointer location
             gl.uniform1f( uF, guivar.f )
+
+            // get pointer to uniform in shader
+            let uK = gl.getUniformLocation( programRender, 'k' )
+            // send value from CPU to GPU pointer location
+            gl.uniform1f( uK, guivar.k )
+
 
             for( let i = 0; i < 12; i++ ) pingpong()
 
