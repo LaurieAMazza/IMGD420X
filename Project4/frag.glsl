@@ -3,14 +3,24 @@ precision mediump float;
 #endif
 
 // below is the line that imports our noise function
-#pragma glslify: snoise3 = require(glsl-noise/simplex/3d)
+//#pragma glslify: snoise3 = require(glsl-noise/simplex/3d)
 
 uniform float time;
+uniform sampler2D state;
 uniform vec2 resolution;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / resolution;
-  float noise = snoise3( vec3(uv.x*100., uv.y*100., time/50.) );
 
-  gl_FragColor = vec4( noise, noise, noise, 1. );
+  vec4 color = texture2D(state, gl_FragCoord.xy / resolution);
+
+  float x, y;
+  x = fract(uv.x*25.0);
+  y = fract(uv.y*25.0);
+
+  if(x > 0.9 || y > 0.9){
+    gl_FragColor = vec4(1.,1.,1.,1.);
+  } else {
+    gl_FragColor = vec4( color.r, color.g, color.b, 1. );
+  }
 }

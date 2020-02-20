@@ -2044,16 +2044,86 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 },{}],4:[function(require,module,exports){
 const glslify = require( 'glslify' )
 const toy     = require( 'gl-toy' )
+const fbo     = require( 'gl-fbo' )
+const createShader = require('gl-shader')
 
-const shader = glslify(["#ifdef GL_ES\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// below is the line that imports our noise function\n//\n// Description : Array and textureless GLSL 2D/3D/4D simplex\n//               noise functions.\n//      Author : Ian McEwan, Ashima Arts.\n//  Maintainer : ijm\n//     Lastmod : 20110822 (ijm)\n//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.\n//               Distributed under the MIT License. See LICENSE file.\n//               https://github.com/ashima/webgl-noise\n//\n\nvec3 mod289(vec3 x) {\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 mod289(vec4 x) {\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 permute(vec4 x) {\n     return mod289(((x*34.0)+1.0)*x);\n}\n\nvec4 taylorInvSqrt(vec4 r)\n{\n  return 1.79284291400159 - 0.85373472095314 * r;\n}\n\nfloat snoise(vec3 v)\n  {\n  const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;\n  const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);\n\n// First corner\n  vec3 i  = floor(v + dot(v, C.yyy) );\n  vec3 x0 =   v - i + dot(i, C.xxx) ;\n\n// Other corners\n  vec3 g = step(x0.yzx, x0.xyz);\n  vec3 l = 1.0 - g;\n  vec3 i1 = min( g.xyz, l.zxy );\n  vec3 i2 = max( g.xyz, l.zxy );\n\n  //   x0 = x0 - 0.0 + 0.0 * C.xxx;\n  //   x1 = x0 - i1  + 1.0 * C.xxx;\n  //   x2 = x0 - i2  + 2.0 * C.xxx;\n  //   x3 = x0 - 1.0 + 3.0 * C.xxx;\n  vec3 x1 = x0 - i1 + C.xxx;\n  vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y\n  vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y\n\n// Permutations\n  i = mod289(i);\n  vec4 p = permute( permute( permute(\n             i.z + vec4(0.0, i1.z, i2.z, 1.0 ))\n           + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))\n           + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));\n\n// Gradients: 7x7 points over a square, mapped onto an octahedron.\n// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)\n  float n_ = 0.142857142857; // 1.0/7.0\n  vec3  ns = n_ * D.wyz - D.xzx;\n\n  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)\n\n  vec4 x_ = floor(j * ns.z);\n  vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)\n\n  vec4 x = x_ *ns.x + ns.yyyy;\n  vec4 y = y_ *ns.x + ns.yyyy;\n  vec4 h = 1.0 - abs(x) - abs(y);\n\n  vec4 b0 = vec4( x.xy, y.xy );\n  vec4 b1 = vec4( x.zw, y.zw );\n\n  //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;\n  //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;\n  vec4 s0 = floor(b0)*2.0 + 1.0;\n  vec4 s1 = floor(b1)*2.0 + 1.0;\n  vec4 sh = -step(h, vec4(0.0));\n\n  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;\n  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;\n\n  vec3 p0 = vec3(a0.xy,h.x);\n  vec3 p1 = vec3(a0.zw,h.y);\n  vec3 p2 = vec3(a1.xy,h.z);\n  vec3 p3 = vec3(a1.zw,h.w);\n\n//Normalise gradients\n  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));\n  p0 *= norm.x;\n  p1 *= norm.y;\n  p2 *= norm.z;\n  p3 *= norm.w;\n\n// Mix final noise value\n  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);\n  m = m * m;\n  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1),\n                                dot(p2,x2), dot(p3,x3) ) );\n  }\n\nuniform float time;\nuniform vec2 resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / resolution;\n  float noise = snoise( vec3(uv.x*100., uv.y*100., time/50.) );\n\n  gl_FragColor = vec4( noise, noise, noise, 1. );\n}"])
+const shader = glslify(["#ifdef GL_ES\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// below is the line that imports our noise function\n//#pragma glslify: snoise3 = require(glsl-noise/simplex/3d)\n\nuniform float time;\nuniform sampler2D state;\nuniform vec2 resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / resolution;\n\n  vec4 color = texture2D(state, gl_FragCoord.xy / resolution);\n\n  float x, y;\n  x = fract(uv.x*25.0);\n  y = fract(uv.y*25.0);\n\n  if(x > 0.9 || y > 0.9){\n    gl_FragColor = vec4(1.,1.,1.,1.);\n  } else {\n    gl_FragColor = vec4( color.r, color.g, color.b, 1. );\n  }\n}"])
+
+let initialized = false, height, width, cellH, cellW
+
+const state = []
+
+//Set color of current cell based on the current color and then set the direction to move in
+function setDirection(curDir, isWhite){}
+
+//gives the new position of the ant
+function nextPosition(pos, dir){}
+
+//move the ant
+
+
+//
+function poke( x, y, value, texture ) {
+    const gl = texture.gl
+    texture.bind()
+
+    gl.texSubImage2D(
+        gl.TEXTURE_2D, 0,
+        x, y, 1, 1,
+        gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([ value,value,value, 255 ])
+    )
+}
+
+//Place ant
+
+
+//int grid set up
+function intAnt(h, w, size, tex) {
+    //set ant at mid; need to get mid of size
+    //for(l = 0; l < size; l++){
+    console.log(h,w)
+        for( i = 0; i < w; i++ ) {
+            for( j = 0; j < h; j++ ) {
+                if( ((Math.ceil(size/2)/size) > i/w && i/w > (Math.floor(size/2)/size)) && ((Math.ceil(size/2)/size) > j/h && j/h > (Math.floor(size/2)/size))) {
+                  //if((i/w)==(size/2)/size && (j/h)==(size/2)/size){
+                    console.log(i,j)
+                    poke( i, j, 255, tex )
+                }
+            }
+        }
+    //}
+}
+
+//
+function int(gl, size){
+    //create the grid
+    height = gl.drawingBufferHeight
+    width = gl.drawingBufferWidth
+
+    state[0] = fbo( gl, [width,height] )
+
+    cellH = height/size
+    cellW = width/size
+
+    intAnt(height, width, size, state[0].color[0])
+    initialized = true
+}
 
 let count = 0
 toy( shader, (gl, shader) => {
     // this function runs once per frame
+    if(!initialized){
+        int(gl, 25)
+    }
+
+    //shader.bind()
+
     shader.uniforms.resolution = [ gl.drawingBufferWidth, gl.drawingBufferHeight ]
+    shader.uniforms.state = state[ 0 ].color[0].bind()
     shader.uniforms.time = count++
 })
-},{"gl-toy":27,"glslify":40}],5:[function(require,module,exports){
+},{"gl-fbo":19,"gl-shader":21,"gl-toy":29,"glslify":42}],5:[function(require,module,exports){
 'use strict'
 
 var weakMap      = typeof WeakMap === 'undefined' ? require('weak-map') : WeakMap
@@ -2084,7 +2154,7 @@ function createABigTriangle(gl) {
 
 module.exports = createABigTriangle
 
-},{"gl-buffer":15,"gl-vao":31,"weak-map":51}],6:[function(require,module,exports){
+},{"gl-buffer":15,"gl-vao":33,"weak-map":53}],6:[function(require,module,exports){
 var padLeft = require('pad-left')
 
 module.exports = addLineNumbers
@@ -2102,7 +2172,7 @@ function addLineNumbers (string, start, delim) {
   }).join('\n')
 }
 
-},{"pad-left":45}],7:[function(require,module,exports){
+},{"pad-left":47}],7:[function(require,module,exports){
 module.exports = function _atob(str) {
   return atob(str)
 }
@@ -2834,7 +2904,7 @@ function generateCWiseOp(proc, typesig) {
 }
 module.exports = generateCWiseOp
 
-},{"uniq":50}],12:[function(require,module,exports){
+},{"uniq":52}],12:[function(require,module,exports){
 "use strict"
 
 // The function below is called when constructing a cwise function object, and does the following:
@@ -3162,7 +3232,7 @@ function createBuffer(gl, data, type, usage) {
 
 module.exports = createBuffer
 
-},{"ndarray":44,"ndarray-ops":43,"typedarray-pool":49}],16:[function(require,module,exports){
+},{"ndarray":46,"ndarray-ops":45,"typedarray-pool":51}],16:[function(require,module,exports){
 module.exports = {
   0: 'NONE',
   1: 'ONE',
@@ -3502,7 +3572,474 @@ function createContext(canvas, opts, render) {
   }
 }
 
-},{"raf-component":46}],19:[function(require,module,exports){
+},{"raf-component":48}],19:[function(require,module,exports){
+'use strict'
+
+var createTexture = require('gl-texture2d')
+
+module.exports = createFBO
+
+var colorAttachmentArrays = null
+var FRAMEBUFFER_UNSUPPORTED
+var FRAMEBUFFER_INCOMPLETE_ATTACHMENT
+var FRAMEBUFFER_INCOMPLETE_DIMENSIONS
+var FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT
+
+function saveFBOState(gl) {
+  var fbo = gl.getParameter(gl.FRAMEBUFFER_BINDING)
+  var rbo = gl.getParameter(gl.RENDERBUFFER_BINDING)
+  var tex = gl.getParameter(gl.TEXTURE_BINDING_2D)
+  return [fbo, rbo, tex]
+}
+
+function restoreFBOState(gl, data) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, data[0])
+  gl.bindRenderbuffer(gl.RENDERBUFFER, data[1])
+  gl.bindTexture(gl.TEXTURE_2D, data[2])
+}
+
+function lazyInitColorAttachments(gl, ext) {
+  var maxColorAttachments = gl.getParameter(ext.MAX_COLOR_ATTACHMENTS_WEBGL)
+  colorAttachmentArrays = new Array(maxColorAttachments + 1)
+  for(var i=0; i<=maxColorAttachments; ++i) {
+    var x = new Array(maxColorAttachments)
+    for(var j=0; j<i; ++j) {
+      x[j] = gl.COLOR_ATTACHMENT0 + j
+    }
+    for(var j=i; j<maxColorAttachments; ++j) {
+      x[j] = gl.NONE
+    }
+    colorAttachmentArrays[i] = x
+  }
+}
+
+//Throw an appropriate error
+function throwFBOError(status) {
+  switch(status){
+    case FRAMEBUFFER_UNSUPPORTED:
+      throw new Error('gl-fbo: Framebuffer unsupported')
+    case FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+      throw new Error('gl-fbo: Framebuffer incomplete attachment')
+    case FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+      throw new Error('gl-fbo: Framebuffer incomplete dimensions')
+    case FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+      throw new Error('gl-fbo: Framebuffer incomplete missing attachment')
+    default:
+      throw new Error('gl-fbo: Framebuffer failed for unspecified reason')
+  }
+}
+
+//Initialize a texture object
+function initTexture(gl, width, height, type, format, attachment) {
+  if(!type) {
+    return null
+  }
+  var result = createTexture(gl, width, height, format, type)
+  result.magFilter = gl.NEAREST
+  result.minFilter = gl.NEAREST
+  result.mipSamples = 1
+  result.bind()
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, attachment, gl.TEXTURE_2D, result.handle, 0)
+  return result
+}
+
+//Initialize a render buffer object
+function initRenderBuffer(gl, width, height, component, attachment) {
+  var result = gl.createRenderbuffer()
+  gl.bindRenderbuffer(gl.RENDERBUFFER, result)
+  gl.renderbufferStorage(gl.RENDERBUFFER, component, width, height)
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, attachment, gl.RENDERBUFFER, result)
+  return result
+}
+
+//Rebuild the frame buffer
+function rebuildFBO(fbo) {
+
+  //Save FBO state
+  var state = saveFBOState(fbo.gl)
+
+  var gl = fbo.gl
+  var handle = fbo.handle = gl.createFramebuffer()
+  var width = fbo._shape[0]
+  var height = fbo._shape[1]
+  var numColors = fbo.color.length
+  var ext = fbo._ext
+  var useStencil = fbo._useStencil
+  var useDepth = fbo._useDepth
+  var colorType = fbo._colorType
+
+  //Bind the fbo
+  gl.bindFramebuffer(gl.FRAMEBUFFER, handle)
+
+  //Allocate color buffers
+  for(var i=0; i<numColors; ++i) {
+    fbo.color[i] = initTexture(gl, width, height, colorType, gl.RGBA, gl.COLOR_ATTACHMENT0 + i)
+  }
+  if(numColors === 0) {
+    fbo._color_rb = initRenderBuffer(gl, width, height, gl.RGBA4, gl.COLOR_ATTACHMENT0)
+    if(ext) {
+      ext.drawBuffersWEBGL(colorAttachmentArrays[0])
+    }
+  } else if(numColors > 1) {
+    ext.drawBuffersWEBGL(colorAttachmentArrays[numColors])
+  }
+
+  //Allocate depth/stencil buffers
+  var WEBGL_depth_texture = gl.getExtension('WEBGL_depth_texture')
+  if(WEBGL_depth_texture) {
+    if(useStencil) {
+      fbo.depth = initTexture(gl, width, height,
+                          WEBGL_depth_texture.UNSIGNED_INT_24_8_WEBGL,
+                          gl.DEPTH_STENCIL,
+                          gl.DEPTH_STENCIL_ATTACHMENT)
+    } else if(useDepth) {
+      fbo.depth = initTexture(gl, width, height,
+                          gl.UNSIGNED_SHORT,
+                          gl.DEPTH_COMPONENT,
+                          gl.DEPTH_ATTACHMENT)
+    }
+  } else {
+    if(useDepth && useStencil) {
+      fbo._depth_rb = initRenderBuffer(gl, width, height, gl.DEPTH_STENCIL, gl.DEPTH_STENCIL_ATTACHMENT)
+    } else if(useDepth) {
+      fbo._depth_rb = initRenderBuffer(gl, width, height, gl.DEPTH_COMPONENT16, gl.DEPTH_ATTACHMENT)
+    } else if(useStencil) {
+      fbo._depth_rb = initRenderBuffer(gl, width, height, gl.STENCIL_INDEX, gl.STENCIL_ATTACHMENT)
+    }
+  }
+
+  //Check frame buffer state
+  var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
+  if(status !== gl.FRAMEBUFFER_COMPLETE) {
+
+    //Release all partially allocated resources
+    fbo._destroyed = true
+
+    //Release all resources
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.deleteFramebuffer(fbo.handle)
+    fbo.handle = null
+    if(fbo.depth) {
+      fbo.depth.dispose()
+      fbo.depth = null
+    }
+    if(fbo._depth_rb) {
+      gl.deleteRenderbuffer(fbo._depth_rb)
+      fbo._depth_rb = null
+    }
+    for(var i=0; i<fbo.color.length; ++i) {
+      fbo.color[i].dispose()
+      fbo.color[i] = null
+    }
+    if(fbo._color_rb) {
+      gl.deleteRenderbuffer(fbo._color_rb)
+      fbo._color_rb = null
+    }
+
+    restoreFBOState(gl, state)
+
+    //Throw the frame buffer error
+    throwFBOError(status)
+  }
+
+  //Everything ok, let's get on with life
+  restoreFBOState(gl, state)
+}
+
+function Framebuffer(gl, width, height, colorType, numColors, useDepth, useStencil, ext) {
+
+  //Handle and set properties
+  this.gl = gl
+  this._shape = [width|0, height|0]
+  this._destroyed = false
+  this._ext = ext
+
+  //Allocate buffers
+  this.color = new Array(numColors)
+  for(var i=0; i<numColors; ++i) {
+    this.color[i] = null
+  }
+  this._color_rb = null
+  this.depth = null
+  this._depth_rb = null
+
+  //Save depth and stencil flags
+  this._colorType = colorType
+  this._useDepth = useDepth
+  this._useStencil = useStencil
+
+  //Shape vector for resizing
+  var parent = this
+  var shapeVector = [width|0, height|0]
+  Object.defineProperties(shapeVector, {
+    0: {
+      get: function() {
+        return parent._shape[0]
+      },
+      set: function(w) {
+        return parent.width = w
+      }
+    },
+    1: {
+      get: function() {
+        return parent._shape[1]
+      },
+      set: function(h) {
+        return parent.height = h
+      }
+    }
+  })
+  this._shapeVector = shapeVector
+
+  //Initialize all attachments
+  rebuildFBO(this)
+}
+
+var proto = Framebuffer.prototype
+
+function reshapeFBO(fbo, w, h) {
+  //If fbo is invalid, just skip this
+  if(fbo._destroyed) {
+    throw new Error('gl-fbo: Can\'t resize destroyed FBO')
+  }
+
+  //Don't resize if no change in shape
+  if( (fbo._shape[0] === w) &&
+      (fbo._shape[1] === h) ) {
+    return
+  }
+
+  var gl = fbo.gl
+
+  //Check parameter ranges
+  var maxFBOSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
+  if( w < 0 || w > maxFBOSize ||
+      h < 0 || h > maxFBOSize) {
+    throw new Error('gl-fbo: Can\'t resize FBO, invalid dimensions')
+  }
+
+  //Update shape
+  fbo._shape[0] = w
+  fbo._shape[1] = h
+
+  //Save framebuffer state
+  var state = saveFBOState(gl)
+
+  //Resize framebuffer attachments
+  for(var i=0; i<fbo.color.length; ++i) {
+    fbo.color[i].shape = fbo._shape
+  }
+  if(fbo._color_rb) {
+    gl.bindRenderbuffer(gl.RENDERBUFFER, fbo._color_rb)
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA4, fbo._shape[0], fbo._shape[1])
+  }
+  if(fbo.depth) {
+    fbo.depth.shape = fbo._shape
+  }
+  if(fbo._depth_rb) {
+    gl.bindRenderbuffer(gl.RENDERBUFFER, fbo._depth_rb)
+    if(fbo._useDepth && fbo._useStencil) {
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, fbo._shape[0], fbo._shape[1])
+    } else if(fbo._useDepth) {
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, fbo._shape[0], fbo._shape[1])
+    } else if(fbo._useStencil) {
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.STENCIL_INDEX, fbo._shape[0], fbo._shape[1])
+    }
+  }
+
+  //Check FBO status after resize, if something broke then die in a fire
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.handle)
+  var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
+  if(status !== gl.FRAMEBUFFER_COMPLETE) {
+    fbo.dispose()
+    restoreFBOState(gl, state)
+    throwFBOError(status)
+  }
+
+  //Restore framebuffer state
+  restoreFBOState(gl, state)
+}
+
+Object.defineProperties(proto, {
+  'shape': {
+    get: function() {
+      if(this._destroyed) {
+        return [0,0]
+      }
+      return this._shapeVector
+    },
+    set: function(x) {
+      if(!Array.isArray(x)) {
+        x = [x|0, x|0]
+      }
+      if(x.length !== 2) {
+        throw new Error('gl-fbo: Shape vector must be length 2')
+      }
+
+      var w = x[0]|0
+      var h = x[1]|0
+      reshapeFBO(this, w, h)
+
+      return [w, h]
+    },
+    enumerable: false
+  },
+  'width': {
+    get: function() {
+      if(this._destroyed) {
+        return 0
+      }
+      return this._shape[0]
+    },
+    set: function(w) {
+      w = w|0
+      reshapeFBO(this, w, this._shape[1])
+      return w
+    },
+    enumerable: false
+  },
+  'height': {
+    get: function() {
+      if(this._destroyed) {
+        return 0
+      }
+      return this._shape[1]
+    },
+    set: function(h) {
+      h = h|0
+      reshapeFBO(this, this._shape[0], h)
+      return h
+    },
+    enumerable: false
+  }
+})
+
+proto.bind = function() {
+  if(this._destroyed) {
+    return
+  }
+  var gl = this.gl
+  gl.bindFramebuffer(gl.FRAMEBUFFER, this.handle)
+  gl.viewport(0, 0, this._shape[0], this._shape[1])
+}
+
+proto.dispose = function() {
+  if(this._destroyed) {
+    return
+  }
+  this._destroyed = true
+  var gl = this.gl
+  gl.deleteFramebuffer(this.handle)
+  this.handle = null
+  if(this.depth) {
+    this.depth.dispose()
+    this.depth = null
+  }
+  if(this._depth_rb) {
+    gl.deleteRenderbuffer(this._depth_rb)
+    this._depth_rb = null
+  }
+  for(var i=0; i<this.color.length; ++i) {
+    this.color[i].dispose()
+    this.color[i] = null
+  }
+  if(this._color_rb) {
+    gl.deleteRenderbuffer(this._color_rb)
+    this._color_rb = null
+  }
+}
+
+function createFBO(gl, width, height, options) {
+
+  //Update frame buffer error code values
+  if(!FRAMEBUFFER_UNSUPPORTED) {
+    FRAMEBUFFER_UNSUPPORTED = gl.FRAMEBUFFER_UNSUPPORTED
+    FRAMEBUFFER_INCOMPLETE_ATTACHMENT = gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT
+    FRAMEBUFFER_INCOMPLETE_DIMENSIONS = gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS
+    FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT = gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT
+  }
+
+  //Lazily initialize color attachment arrays
+  var WEBGL_draw_buffers = gl.getExtension('WEBGL_draw_buffers')
+  if(!colorAttachmentArrays && WEBGL_draw_buffers) {
+    lazyInitColorAttachments(gl, WEBGL_draw_buffers)
+  }
+
+  //Special case: Can accept an array as argument
+  if(Array.isArray(width)) {
+    options = height
+    height = width[1]|0
+    width = width[0]|0
+  }
+
+  if(typeof width !== 'number') {
+    throw new Error('gl-fbo: Missing shape parameter')
+  }
+
+  //Validate width/height properties
+  var maxFBOSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
+  if(width < 0 || width > maxFBOSize || height < 0 || height > maxFBOSize) {
+    throw new Error('gl-fbo: Parameters are too large for FBO')
+  }
+
+  //Handle each option type
+  options = options || {}
+
+  //Figure out number of color buffers to use
+  var numColors = 1
+  if('color' in options) {
+    numColors = Math.max(options.color|0, 0)
+    if(numColors < 0) {
+      throw new Error('gl-fbo: Must specify a nonnegative number of colors')
+    }
+    if(numColors > 1) {
+      //Check if multiple render targets supported
+      if(!WEBGL_draw_buffers) {
+        throw new Error('gl-fbo: Multiple draw buffer extension not supported')
+      } else if(numColors > gl.getParameter(WEBGL_draw_buffers.MAX_COLOR_ATTACHMENTS_WEBGL)) {
+        throw new Error('gl-fbo: Context does not support ' + numColors + ' draw buffers')
+      }
+    }
+  }
+
+  //Determine whether to use floating point textures
+  var colorType = gl.UNSIGNED_BYTE
+  var OES_texture_float = gl.getExtension('OES_texture_float')
+  if(options.float && numColors > 0) {
+    if(!OES_texture_float) {
+      throw new Error('gl-fbo: Context does not support floating point textures')
+    }
+    colorType = gl.FLOAT
+  } else if(options.preferFloat && numColors > 0) {
+    if(OES_texture_float) {
+      colorType = gl.FLOAT
+    }
+  }
+
+  //Check if we should use depth buffer
+  var useDepth = true
+  if('depth' in options) {
+    useDepth = !!options.depth
+  }
+
+  //Check if we should use a stencil buffer
+  var useStencil = false
+  if('stencil' in options) {
+    useStencil = !!options.stencil
+  }
+
+  return new Framebuffer(
+    gl,
+    width,
+    height,
+    colorType,
+    numColors,
+    useDepth,
+    useStencil,
+    WEBGL_draw_buffers)
+}
+
+},{"gl-texture2d":28}],20:[function(require,module,exports){
 
 var sprintf = require('sprintf-js').sprintf;
 var glConstants = require('gl-constants/lookup');
@@ -3557,7 +4094,7 @@ function formatCompilerError(errLog, src, type) {
 }
 
 
-},{"add-line-numbers":6,"gl-constants/lookup":17,"glsl-shader-name":32,"sprintf-js":48}],20:[function(require,module,exports){
+},{"add-line-numbers":6,"gl-constants/lookup":17,"glsl-shader-name":34,"sprintf-js":50}],21:[function(require,module,exports){
 'use strict'
 
 var createUniformWrapper   = require('./lib/create-uniforms')
@@ -3823,7 +4360,7 @@ function createShader(
 
 module.exports = createShader
 
-},{"./lib/GLError":21,"./lib/create-attributes":22,"./lib/create-uniforms":23,"./lib/reflect":24,"./lib/runtime-reflect":25,"./lib/shader-cache":26}],21:[function(require,module,exports){
+},{"./lib/GLError":22,"./lib/create-attributes":23,"./lib/create-uniforms":24,"./lib/reflect":25,"./lib/runtime-reflect":26,"./lib/shader-cache":27}],22:[function(require,module,exports){
 function GLError (rawError, shortMessage, longMessage) {
     this.shortMessage = shortMessage || ''
     this.longMessage = longMessage || ''
@@ -3838,7 +4375,7 @@ GLError.prototype.name = 'GLError'
 GLError.prototype.constructor = GLError
 module.exports = GLError
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict'
 
 module.exports = createAttributeWrapper
@@ -4103,7 +4640,7 @@ function createAttributeWrapper(
   return obj
 }
 
-},{"./GLError":21}],23:[function(require,module,exports){
+},{"./GLError":22}],24:[function(require,module,exports){
 'use strict'
 
 var coallesceUniforms = require('./reflect')
@@ -4296,7 +4833,7 @@ function createUniformWrapper(gl, wrapper, uniforms, locations) {
   }
 }
 
-},{"./GLError":21,"./reflect":24}],24:[function(require,module,exports){
+},{"./GLError":22,"./reflect":25}],25:[function(require,module,exports){
 'use strict'
 
 module.exports = makeReflectTypes
@@ -4354,7 +4891,7 @@ function makeReflectTypes(uniforms, useIndex) {
   }
   return obj
 }
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 'use strict'
 
 exports.uniforms    = runtimeUniforms
@@ -4434,7 +4971,7 @@ function runtimeAttributes(gl, program) {
   return result
 }
 
-},{}],26:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 'use strict'
 
 exports.shader   = getShaderReference
@@ -4572,7 +5109,570 @@ function createProgram(gl, vref, fref, attribs, locations) {
   return getCache(gl).getProgram(vref, fref, attribs, locations)
 }
 
-},{"./GLError":21,"gl-format-compiler-error":19,"weakmap-shim":54}],27:[function(require,module,exports){
+},{"./GLError":22,"gl-format-compiler-error":20,"weakmap-shim":56}],28:[function(require,module,exports){
+'use strict'
+
+var ndarray = require('ndarray')
+var ops     = require('ndarray-ops')
+var pool    = require('typedarray-pool')
+
+module.exports = createTexture2D
+
+var linearTypes = null
+var filterTypes = null
+var wrapTypes   = null
+
+function lazyInitLinearTypes(gl) {
+  linearTypes = [
+    gl.LINEAR,
+    gl.NEAREST_MIPMAP_LINEAR,
+    gl.LINEAR_MIPMAP_NEAREST,
+    gl.LINEAR_MIPMAP_NEAREST
+  ]
+  filterTypes = [
+    gl.NEAREST,
+    gl.LINEAR,
+    gl.NEAREST_MIPMAP_NEAREST,
+    gl.NEAREST_MIPMAP_LINEAR,
+    gl.LINEAR_MIPMAP_NEAREST,
+    gl.LINEAR_MIPMAP_LINEAR
+  ]
+  wrapTypes = [
+    gl.REPEAT,
+    gl.CLAMP_TO_EDGE,
+    gl.MIRRORED_REPEAT
+  ]
+}
+
+function acceptTextureDOM (obj) {
+  return (
+    ('undefined' != typeof HTMLCanvasElement && obj instanceof HTMLCanvasElement) ||
+    ('undefined' != typeof HTMLImageElement && obj instanceof HTMLImageElement) ||
+    ('undefined' != typeof HTMLVideoElement && obj instanceof HTMLVideoElement) ||
+    ('undefined' != typeof ImageData && obj instanceof ImageData))
+}
+
+var convertFloatToUint8 = function(out, inp) {
+  ops.muls(out, inp, 255.0)
+}
+
+function reshapeTexture(tex, w, h) {
+  var gl = tex.gl
+  var maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  if(w < 0 || w > maxSize || h < 0 || h > maxSize) {
+    throw new Error('gl-texture2d: Invalid texture size')
+  }
+  tex._shape = [w, h]
+  tex.bind()
+  gl.texImage2D(gl.TEXTURE_2D, 0, tex.format, w, h, 0, tex.format, tex.type, null)
+  tex._mipLevels = [0]
+  return tex
+}
+
+function Texture2D(gl, handle, width, height, format, type) {
+  this.gl = gl
+  this.handle = handle
+  this.format = format
+  this.type = type
+  this._shape = [width, height]
+  this._mipLevels = [0]
+  this._magFilter = gl.NEAREST
+  this._minFilter = gl.NEAREST
+  this._wrapS = gl.CLAMP_TO_EDGE
+  this._wrapT = gl.CLAMP_TO_EDGE
+  this._anisoSamples = 1
+
+  var parent = this
+  var wrapVector = [this._wrapS, this._wrapT]
+  Object.defineProperties(wrapVector, [
+    {
+      get: function() {
+        return parent._wrapS
+      },
+      set: function(v) {
+        return parent.wrapS = v
+      }
+    },
+    {
+      get: function() {
+        return parent._wrapT
+      },
+      set: function(v) {
+        return parent.wrapT = v
+      }
+    }
+  ])
+  this._wrapVector = wrapVector
+
+  var shapeVector = [this._shape[0], this._shape[1]]
+  Object.defineProperties(shapeVector, [
+    {
+      get: function() {
+        return parent._shape[0]
+      },
+      set: function(v) {
+        return parent.width = v
+      }
+    },
+    {
+      get: function() {
+        return parent._shape[1]
+      },
+      set: function(v) {
+        return parent.height = v
+      }
+    }
+  ])
+  this._shapeVector = shapeVector
+}
+
+var proto = Texture2D.prototype
+
+Object.defineProperties(proto, {
+  minFilter: {
+    get: function() {
+      return this._minFilter
+    },
+    set: function(v) {
+      this.bind()
+      var gl = this.gl
+      if(this.type === gl.FLOAT && linearTypes.indexOf(v) >= 0) {
+        if(!gl.getExtension('OES_texture_float_linear')) {
+          v = gl.NEAREST
+        }
+      }
+      if(filterTypes.indexOf(v) < 0) {
+        throw new Error('gl-texture2d: Unknown filter mode ' + v)
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, v)
+      return this._minFilter = v
+    }
+  },
+  magFilter: {
+    get: function() {
+      return this._magFilter
+    },
+    set: function(v) {
+      this.bind()
+      var gl = this.gl
+      if(this.type === gl.FLOAT && linearTypes.indexOf(v) >= 0) {
+        if(!gl.getExtension('OES_texture_float_linear')) {
+          v = gl.NEAREST
+        }
+      }
+      if(filterTypes.indexOf(v) < 0) {
+        throw new Error('gl-texture2d: Unknown filter mode ' + v)
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, v)
+      return this._magFilter = v
+    }
+  },
+  mipSamples: {
+    get: function() {
+      return this._anisoSamples
+    },
+    set: function(i) {
+      var psamples = this._anisoSamples
+      this._anisoSamples = Math.max(i, 1)|0
+      if(psamples !== this._anisoSamples) {
+        var ext = this.gl.getExtension('EXT_texture_filter_anisotropic')
+        if(ext) {
+          this.gl.texParameterf(this.gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, this._anisoSamples)
+        }
+      }
+      return this._anisoSamples
+    }
+  },
+  wrapS: {
+    get: function() {
+      return this._wrapS
+    },
+    set: function(v) {
+      this.bind()
+      if(wrapTypes.indexOf(v) < 0) {
+        throw new Error('gl-texture2d: Unknown wrap mode ' + v)
+      }
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, v)
+      return this._wrapS = v
+    }
+  },
+  wrapT: {
+    get: function() {
+      return this._wrapT
+    },
+    set: function(v) {
+      this.bind()
+      if(wrapTypes.indexOf(v) < 0) {
+        throw new Error('gl-texture2d: Unknown wrap mode ' + v)
+      }
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, v)
+      return this._wrapT = v
+    }
+  },
+  wrap: {
+    get: function() {
+      return this._wrapVector
+    },
+    set: function(v) {
+      if(!Array.isArray(v)) {
+        v = [v,v]
+      }
+      if(v.length !== 2) {
+        throw new Error('gl-texture2d: Must specify wrap mode for rows and columns')
+      }
+      for(var i=0; i<2; ++i) {
+        if(wrapTypes.indexOf(v[i]) < 0) {
+          throw new Error('gl-texture2d: Unknown wrap mode ' + v)
+        }
+      }
+      this._wrapS = v[0]
+      this._wrapT = v[1]
+
+      var gl = this.gl
+      this.bind()
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, this._wrapS)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, this._wrapT)
+
+      return v
+    }
+  },
+  shape: {
+    get: function() {
+      return this._shapeVector
+    },
+    set: function(x) {
+      if(!Array.isArray(x)) {
+        x = [x|0,x|0]
+      } else {
+        if(x.length !== 2) {
+          throw new Error('gl-texture2d: Invalid texture shape')
+        }
+      }
+      reshapeTexture(this, x[0]|0, x[1]|0)
+      return [x[0]|0, x[1]|0]
+    }
+  },
+  width: {
+    get: function() {
+      return this._shape[0]
+    },
+    set: function(w) {
+      w = w|0
+      reshapeTexture(this, w, this._shape[1])
+      return w
+    }
+  },
+  height: {
+    get: function() {
+      return this._shape[1]
+    },
+    set: function(h) {
+      h = h|0
+      reshapeTexture(this, this._shape[0], h)
+      return h
+    }
+  }
+})
+
+proto.bind = function(unit) {
+  var gl = this.gl
+  if(unit !== undefined) {
+    gl.activeTexture(gl.TEXTURE0 + (unit|0))
+  }
+  gl.bindTexture(gl.TEXTURE_2D, this.handle)
+  if(unit !== undefined) {
+    return (unit|0)
+  }
+  return gl.getParameter(gl.ACTIVE_TEXTURE) - gl.TEXTURE0
+}
+
+proto.dispose = function() {
+  this.gl.deleteTexture(this.handle)
+}
+
+proto.generateMipmap = function() {
+  this.bind()
+  this.gl.generateMipmap(this.gl.TEXTURE_2D)
+
+  //Update mip levels
+  var l = Math.min(this._shape[0], this._shape[1])
+  for(var i=0; l>0; ++i, l>>>=1) {
+    if(this._mipLevels.indexOf(i) < 0) {
+      this._mipLevels.push(i)
+    }
+  }
+}
+
+proto.setPixels = function(data, x_off, y_off, mip_level) {
+  var gl = this.gl
+  this.bind()
+  if(Array.isArray(x_off)) {
+    mip_level = y_off
+    y_off = x_off[1]|0
+    x_off = x_off[0]|0
+  } else {
+    x_off = x_off || 0
+    y_off = y_off || 0
+  }
+  mip_level = mip_level || 0
+  var directData = acceptTextureDOM(data) ? data : data.raw
+  if(directData) {
+    var needsMip = this._mipLevels.indexOf(mip_level) < 0
+    if(needsMip) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, this.format, this.format, this.type, directData)
+      this._mipLevels.push(mip_level)
+    } else {
+      gl.texSubImage2D(gl.TEXTURE_2D, mip_level, x_off, y_off, this.format, this.type, directData)
+    }
+  } else if(data.shape && data.stride && data.data) {
+    if(data.shape.length < 2 ||
+       x_off + data.shape[1] > this._shape[1]>>>mip_level ||
+       y_off + data.shape[0] > this._shape[0]>>>mip_level ||
+       x_off < 0 ||
+       y_off < 0) {
+      throw new Error('gl-texture2d: Texture dimensions are out of bounds')
+    }
+    texSubImageArray(gl, x_off, y_off, mip_level, this.format, this.type, this._mipLevels, data)
+  } else {
+    throw new Error('gl-texture2d: Unsupported data type')
+  }
+}
+
+
+function isPacked(shape, stride) {
+  if(shape.length === 3) {
+    return  (stride[2] === 1) &&
+            (stride[1] === shape[0]*shape[2]) &&
+            (stride[0] === shape[2])
+  }
+  return  (stride[0] === 1) &&
+          (stride[1] === shape[0])
+}
+
+function texSubImageArray(gl, x_off, y_off, mip_level, cformat, ctype, mipLevels, array) {
+  var dtype = array.dtype
+  var shape = array.shape.slice()
+  if(shape.length < 2 || shape.length > 3) {
+    throw new Error('gl-texture2d: Invalid ndarray, must be 2d or 3d')
+  }
+  var type = 0, format = 0
+  var packed = isPacked(shape, array.stride.slice())
+  if(dtype === 'float32') {
+    type = gl.FLOAT
+  } else if(dtype === 'float64') {
+    type = gl.FLOAT
+    packed = false
+    dtype = 'float32'
+  } else if(dtype === 'uint8') {
+    type = gl.UNSIGNED_BYTE
+  } else {
+    type = gl.UNSIGNED_BYTE
+    packed = false
+    dtype = 'uint8'
+  }
+  var channels = 1
+  if(shape.length === 2) {
+    format = gl.LUMINANCE
+    shape = [shape[0], shape[1], 1]
+    array = ndarray(array.data, shape, [array.stride[0], array.stride[1], 1], array.offset)
+  } else if(shape.length === 3) {
+    if(shape[2] === 1) {
+      format = gl.ALPHA
+    } else if(shape[2] === 2) {
+      format = gl.LUMINANCE_ALPHA
+    } else if(shape[2] === 3) {
+      format = gl.RGB
+    } else if(shape[2] === 4) {
+      format = gl.RGBA
+    } else {
+      throw new Error('gl-texture2d: Invalid shape for pixel coords')
+    }
+    channels = shape[2]
+  } else {
+    throw new Error('gl-texture2d: Invalid shape for texture')
+  }
+  //For 1-channel textures allow conversion between formats
+  if((format  === gl.LUMINANCE || format  === gl.ALPHA) &&
+     (cformat === gl.LUMINANCE || cformat === gl.ALPHA)) {
+    format = cformat
+  }
+  if(format !== cformat) {
+    throw new Error('gl-texture2d: Incompatible texture format for setPixels')
+  }
+  var size = array.size
+  var needsMip = mipLevels.indexOf(mip_level) < 0
+  if(needsMip) {
+    mipLevels.push(mip_level)
+  }
+  if(type === ctype && packed) {
+    //Array data types are compatible, can directly copy into texture
+    if(array.offset === 0 && array.data.length === size) {
+      if(needsMip) {
+        gl.texImage2D(gl.TEXTURE_2D, mip_level, cformat, shape[0], shape[1], 0, cformat, ctype, array.data)
+      } else {
+        gl.texSubImage2D(gl.TEXTURE_2D, mip_level, x_off, y_off, shape[0], shape[1], cformat, ctype, array.data)
+      }
+    } else {
+      if(needsMip) {
+        gl.texImage2D(gl.TEXTURE_2D, mip_level, cformat, shape[0], shape[1], 0, cformat, ctype, array.data.subarray(array.offset, array.offset+size))
+      } else {
+        gl.texSubImage2D(gl.TEXTURE_2D, mip_level, x_off, y_off, shape[0], shape[1], cformat, ctype, array.data.subarray(array.offset, array.offset+size))
+      }
+    }
+  } else {
+    //Need to do type conversion to pack data into buffer
+    var pack_buffer
+    if(ctype === gl.FLOAT) {
+      pack_buffer = pool.mallocFloat32(size)
+    } else {
+      pack_buffer = pool.mallocUint8(size)
+    }
+    var pack_view = ndarray(pack_buffer, shape, [shape[2], shape[2]*shape[0], 1])
+    if(type === gl.FLOAT && ctype === gl.UNSIGNED_BYTE) {
+      convertFloatToUint8(pack_view, array)
+    } else {
+      ops.assign(pack_view, array)
+    }
+    if(needsMip) {
+      gl.texImage2D(gl.TEXTURE_2D, mip_level, cformat, shape[0], shape[1], 0, cformat, ctype, pack_buffer.subarray(0, size))
+    } else {
+      gl.texSubImage2D(gl.TEXTURE_2D, mip_level, x_off, y_off, shape[0], shape[1], cformat, ctype, pack_buffer.subarray(0, size))
+    }
+    if(ctype === gl.FLOAT) {
+      pool.freeFloat32(pack_buffer)
+    } else {
+      pool.freeUint8(pack_buffer)
+    }
+  }
+}
+
+function initTexture(gl) {
+  var tex = gl.createTexture()
+  gl.bindTexture(gl.TEXTURE_2D, tex)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  return tex
+}
+
+function createTextureShape(gl, width, height, format, type) {
+  var maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  if(width < 0 || width > maxTextureSize || height < 0 || height  > maxTextureSize) {
+    throw new Error('gl-texture2d: Invalid texture shape')
+  }
+  if(type === gl.FLOAT && !gl.getExtension('OES_texture_float')) {
+    throw new Error('gl-texture2d: Floating point textures not supported on this platform')
+  }
+  var tex = initTexture(gl)
+  gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, null)
+  return new Texture2D(gl, tex, width, height, format, type)
+}
+
+function createTextureDOM(gl, directData, width, height, format, type) {
+  var tex = initTexture(gl)
+  gl.texImage2D(gl.TEXTURE_2D, 0, format, format, type, directData)
+  return new Texture2D(gl, tex, width, height, format, type)
+}
+
+//Creates a texture from an ndarray
+function createTextureArray(gl, array) {
+  var dtype = array.dtype
+  var shape = array.shape.slice()
+  var maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  if(shape[0] < 0 || shape[0] > maxSize || shape[1] < 0 || shape[1] > maxSize) {
+    throw new Error('gl-texture2d: Invalid texture size')
+  }
+  var packed = isPacked(shape, array.stride.slice())
+  var type = 0
+  if(dtype === 'float32') {
+    type = gl.FLOAT
+  } else if(dtype === 'float64') {
+    type = gl.FLOAT
+    packed = false
+    dtype = 'float32'
+  } else if(dtype === 'uint8') {
+    type = gl.UNSIGNED_BYTE
+  } else {
+    type = gl.UNSIGNED_BYTE
+    packed = false
+    dtype = 'uint8'
+  }
+  var format = 0
+  if(shape.length === 2) {
+    format = gl.LUMINANCE
+    shape = [shape[0], shape[1], 1]
+    array = ndarray(array.data, shape, [array.stride[0], array.stride[1], 1], array.offset)
+  } else if(shape.length === 3) {
+    if(shape[2] === 1) {
+      format = gl.ALPHA
+    } else if(shape[2] === 2) {
+      format = gl.LUMINANCE_ALPHA
+    } else if(shape[2] === 3) {
+      format = gl.RGB
+    } else if(shape[2] === 4) {
+      format = gl.RGBA
+    } else {
+      throw new Error('gl-texture2d: Invalid shape for pixel coords')
+    }
+  } else {
+    throw new Error('gl-texture2d: Invalid shape for texture')
+  }
+  if(type === gl.FLOAT && !gl.getExtension('OES_texture_float')) {
+    type = gl.UNSIGNED_BYTE
+    packed = false
+  }
+  var buffer, buf_store
+  var size = array.size
+  if(!packed) {
+    var stride = [shape[2], shape[2]*shape[0], 1]
+    buf_store = pool.malloc(size, dtype)
+    var buf_array = ndarray(buf_store, shape, stride, 0)
+    if((dtype === 'float32' || dtype === 'float64') && type === gl.UNSIGNED_BYTE) {
+      convertFloatToUint8(buf_array, array)
+    } else {
+      ops.assign(buf_array, array)
+    }
+    buffer = buf_store.subarray(0, size)
+  } else if (array.offset === 0 && array.data.length === size) {
+    buffer = array.data
+  } else {
+    buffer = array.data.subarray(array.offset, array.offset + size)
+  }
+  var tex = initTexture(gl)
+  gl.texImage2D(gl.TEXTURE_2D, 0, format, shape[0], shape[1], 0, format, type, buffer)
+  if(!packed) {
+    pool.free(buf_store)
+  }
+  return new Texture2D(gl, tex, shape[0], shape[1], format, type)
+}
+
+function createTexture2D(gl) {
+  if(arguments.length <= 1) {
+    throw new Error('gl-texture2d: Missing arguments for texture2d constructor')
+  }
+  if(!linearTypes) {
+    lazyInitLinearTypes(gl)
+  }
+  if(typeof arguments[1] === 'number') {
+    return createTextureShape(gl, arguments[1], arguments[2], arguments[3]||gl.RGBA, arguments[4]||gl.UNSIGNED_BYTE)
+  }
+  if(Array.isArray(arguments[1])) {
+    return createTextureShape(gl, arguments[1][0]|0, arguments[1][1]|0, arguments[2]||gl.RGBA, arguments[3]||gl.UNSIGNED_BYTE)
+  }
+  if(typeof arguments[1] === 'object') {
+    var obj = arguments[1]
+    var directData = acceptTextureDOM(obj) ? obj : obj.raw
+    if (directData) {
+      return createTextureDOM(gl, directData, obj.width|0, obj.height|0, arguments[2]||gl.RGBA, arguments[3]||gl.UNSIGNED_BYTE)
+    } else if(obj.shape && obj.data && obj.stride) {
+      return createTextureArray(gl, obj)
+    }
+  }
+  throw new Error('gl-texture2d: Invalid arguments for texture2d constructor')
+}
+
+},{"ndarray":46,"ndarray-ops":45,"typedarray-pool":51}],29:[function(require,module,exports){
 'use strict';
 
 var triangle = require('a-big-triangle');
@@ -4615,7 +5715,7 @@ function toy(frag, cb) {
   }
 }
 
-},{"a-big-triangle":5,"canvas-fit":9,"gl-context":18,"gl-shader":20}],28:[function(require,module,exports){
+},{"a-big-triangle":5,"canvas-fit":9,"gl-context":18,"gl-shader":21}],30:[function(require,module,exports){
 "use strict"
 
 function doBind(gl, elements, attributes) {
@@ -4670,7 +5770,7 @@ function doBind(gl, elements, attributes) {
 }
 
 module.exports = doBind
-},{}],29:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 "use strict"
 
 var bindAttribs = require("./do-bind.js")
@@ -4710,7 +5810,7 @@ function createVAOEmulated(gl) {
 }
 
 module.exports = createVAOEmulated
-},{"./do-bind.js":28}],30:[function(require,module,exports){
+},{"./do-bind.js":30}],32:[function(require,module,exports){
 "use strict"
 
 var bindAttribs = require("./do-bind.js")
@@ -4798,7 +5898,7 @@ function createVAONative(gl, ext) {
 }
 
 module.exports = createVAONative
-},{"./do-bind.js":28}],31:[function(require,module,exports){
+},{"./do-bind.js":30}],33:[function(require,module,exports){
 "use strict"
 
 var createVAONative = require("./lib/vao-native.js")
@@ -4827,7 +5927,7 @@ function createVAO(gl, attributes, elements, elementsType) {
 
 module.exports = createVAO
 
-},{"./lib/vao-emulated.js":29,"./lib/vao-native.js":30}],32:[function(require,module,exports){
+},{"./lib/vao-emulated.js":31,"./lib/vao-native.js":32}],34:[function(require,module,exports){
 var tokenize = require('glsl-tokenizer')
 var atob     = require('atob-lite')
 
@@ -4852,7 +5952,7 @@ function getName(src) {
   }
 }
 
-},{"atob-lite":7,"glsl-tokenizer":39}],33:[function(require,module,exports){
+},{"atob-lite":7,"glsl-tokenizer":41}],35:[function(require,module,exports){
 module.exports = tokenize
 
 var literals100 = require('./lib/literals')
@@ -5229,7 +6329,7 @@ function tokenize(opt) {
   }
 }
 
-},{"./lib/builtins":35,"./lib/builtins-300es":34,"./lib/literals":37,"./lib/literals-300es":36,"./lib/operators":38}],34:[function(require,module,exports){
+},{"./lib/builtins":37,"./lib/builtins-300es":36,"./lib/literals":39,"./lib/literals-300es":38,"./lib/operators":40}],36:[function(require,module,exports){
 // 300es builtins/reserved words that were previously valid in v100
 var v100 = require('./builtins')
 
@@ -5300,7 +6400,7 @@ module.exports = v100.concat([
   , 'textureProjGradOffset'
 ])
 
-},{"./builtins":35}],35:[function(require,module,exports){
+},{"./builtins":37}],37:[function(require,module,exports){
 module.exports = [
   // Keep this list sorted
   'abs'
@@ -5452,7 +6552,7 @@ module.exports = [
   , 'textureCubeGradEXT'
 ]
 
-},{}],36:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 var v100 = require('./literals')
 
 module.exports = v100.slice().concat([
@@ -5541,7 +6641,7 @@ module.exports = v100.slice().concat([
   , 'usampler2DMSArray'
 ])
 
-},{"./literals":37}],37:[function(require,module,exports){
+},{"./literals":39}],39:[function(require,module,exports){
 module.exports = [
   // current
     'precision'
@@ -5637,7 +6737,7 @@ module.exports = [
   , 'using'
 ]
 
-},{}],38:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 module.exports = [
     '<<='
   , '>>='
@@ -5686,7 +6786,7 @@ module.exports = [
   , '}'
 ]
 
-},{}],39:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 var tokenize = require('./index')
 
 module.exports = tokenizeString
@@ -5701,7 +6801,7 @@ function tokenizeString(str, opt) {
   return tokens
 }
 
-},{"./index":33}],40:[function(require,module,exports){
+},{"./index":35}],42:[function(require,module,exports){
 module.exports = function(strings) {
   if (typeof strings === 'string') strings = [strings]
   var exprs = [].slice.call(arguments,1)
@@ -5713,7 +6813,7 @@ module.exports = function(strings) {
   return parts.join('')
 }
 
-},{}],41:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 "use strict"
 
 function iota(n) {
@@ -5725,7 +6825,7 @@ function iota(n) {
 }
 
 module.exports = iota
-},{}],42:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -5748,7 +6848,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],43:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 "use strict"
 
 var compile = require("cwise-compiler")
@@ -6211,7 +7311,7 @@ exports.equals = compile({
 
 
 
-},{"cwise-compiler":10}],44:[function(require,module,exports){
+},{"cwise-compiler":10}],46:[function(require,module,exports){
 var iota = require("iota-array")
 var isBuffer = require("is-buffer")
 
@@ -6562,7 +7662,7 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
 
 module.exports = wrappedNDArrayCtor
 
-},{"iota-array":41,"is-buffer":42}],45:[function(require,module,exports){
+},{"iota-array":43,"is-buffer":44}],47:[function(require,module,exports){
 /*!
  * pad-left <https://github.com/jonschlinkert/pad-left>
  *
@@ -6578,7 +7678,7 @@ module.exports = function padLeft(str, num, ch) {
   ch = typeof ch !== 'undefined' ? (ch + '') : ' ';
   return repeat(ch, num) + str;
 };
-},{"repeat-string":47}],46:[function(require,module,exports){
+},{"repeat-string":49}],48:[function(require,module,exports){
 /**
  * Expose `requestAnimationFrame()`.
  */
@@ -6618,7 +7718,7 @@ exports.cancel = function(id){
   cancel.call(window, id);
 };
 
-},{}],47:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 /*!
  * repeat-string <https://github.com/jonschlinkert/repeat-string>
  *
@@ -6690,7 +7790,7 @@ function repeat(str, num) {
   return res;
 }
 
-},{}],48:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 /* global window, exports, define */
 
 !function() {
@@ -6923,7 +8023,7 @@ function repeat(str, num) {
     /* eslint-enable quote-props */
 }(); // eslint-disable-line
 
-},{}],49:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 (function (global){
 'use strict'
 
@@ -7178,7 +8278,7 @@ exports.clearCache = function clearCache() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"bit-twiddle":8,"buffer":2,"dup":13}],50:[function(require,module,exports){
+},{"bit-twiddle":8,"buffer":2,"dup":13}],52:[function(require,module,exports){
 "use strict"
 
 function unique_pred(list, compare) {
@@ -7237,7 +8337,7 @@ function unique(list, compare, sorted) {
 
 module.exports = unique
 
-},{}],51:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 // Copyright (C) 2011 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -7924,7 +9024,7 @@ module.exports = unique
   }
 })();
 
-},{}],52:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 var hiddenStore = require('./hidden-store.js');
 
 module.exports = createStore;
@@ -7945,7 +9045,7 @@ function createStore() {
     };
 }
 
-},{"./hidden-store.js":53}],53:[function(require,module,exports){
+},{"./hidden-store.js":55}],55:[function(require,module,exports){
 module.exports = hiddenStore;
 
 function hiddenStore(obj, key) {
@@ -7963,7 +9063,7 @@ function hiddenStore(obj, key) {
     return store;
 }
 
-},{}],54:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 // Original - @Gozola.
 // https://gist.github.com/Gozala/1269991
 // This is a reimplemented version (with a few bug fixes).
@@ -7994,4 +9094,4 @@ function weakMap() {
     }
 }
 
-},{"./create-store.js":52}]},{},[4]);
+},{"./create-store.js":54}]},{},[4]);
