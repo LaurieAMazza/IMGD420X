@@ -7,36 +7,51 @@ const getPixels = require('gl-texture2d-pixels')
 const frag = glslify( './frag.glsl' ), vert = glslify( './vert.glsl' ), draw = glslify('./draw.glsl')
 
 
-let initialized = false, height, width, cellH, cellW, sim = null
+let initialized = false, height, width, cellH, cellW, sim = null, grid
 
 const state = []
 
-const direction = ["up", "down", "left", "right"]
 
-let action = 1, ant = [], nextDir = []
+let action = 1, ant = [], nextDir = [], nextColor = []
 
 //Set color of current cell based on the current color and then set the direction to move in
 function setDirection(dir, isWhite){
     if(isWhite){
         switch (dir) {
             case "up":
+                nextDir[0] = "right"
+                nextColor[0] = 0
                 break;
             case "down":
+                nextDir[0] = "left"
+                nextColor[0] = 0
                 break;
             case "left":
+                nextDir[0] = "up"
+                nextColor[0] = 0
                 break;
             case "right":
+                nextDir[0] = "down"
+                nextColor[0] = 0
                 break;
         }
     }else{
         switch (dir) {
             case "up":
+                nextDir[0] = "left"
+                nextColor[0] = 255
                 break;
             case "down":
+                nextDir[0] = "right"
+                nextColor[0] = 255
                 break;
             case "left":
+                nextDir[0] = "down"
+                nextColor[0] = 255
                 break;
             case "right":
+                nextDir[0] = "up"
+                nextColor[0] = 255
                 break;
         }
     }
@@ -44,18 +59,65 @@ function setDirection(dir, isWhite){
 }
 
 //gives the new position of the ant
-function nextPosition(dir){
+function nextPosition(dir, gl){
+    val = nextColor[0]
     switch(dir){
         case "up":
             console.log("moving up")
             //check color of next cell
             nextY = ant[Math.floor(ant.length/2)][1] += cellH
-            next = getPixels(state[0].color[0])[ant[Math.floor(ant.length/2)][0]]
+            next = getPixels(state[0].color[0])[4 * ( nextY * gl.drawingBufferWidth + ant[Math.floor(ant.length/2)][0])]
+            console.log(next)
+            setDirection(dir, (next > 0))
 
             for(i = 0; i < ant.length; i++){
                 ant[i][1] += cellH
-                poke(ant[i][0], ant[i][1], 255, state[0].color[0])
-                //console.log(toy.canvas.getContext('2d').getImageData(ant[i][0], ant[i][1], 1, 1).data)
+                poke(ant[i][0], ant[i][1], val, state[0].color[0])
+            }
+
+            break;
+
+        case "down":
+            console.log("moving down")
+            //check color of next cell
+            nextY = ant[Math.floor(ant.length/2)][1] -= cellH
+            next = getPixels(state[0].color[0])[4 * ( nextY * gl.drawingBufferWidth + ant[Math.floor(ant.length/2)][0])]
+            console.log(next)
+            setDirection(dir, (next > 0))
+
+            for(i = 0; i < ant.length; i++){
+                ant[i][1] -= cellH
+                poke(ant[i][0], ant[i][1], val, state[0].color[0])
+            }
+
+            break;
+
+        case "left":
+            console.log("moving left")
+            //check color of next cell
+            nextX = ant[Math.floor(ant.length/2)][0] -= cellW
+            next = getPixels(state[0].color[0])[4 * ( ant[Math.floor(ant.length/2)][1] * gl.drawingBufferWidth + nextX)]
+            console.log(next)
+            setDirection(dir, (next > 0))
+
+            for(i = 0; i < ant.length; i++){
+                ant[i][0] -= cellW
+                poke(ant[i][0], ant[i][1], val, state[0].color[0])
+            }
+
+            break;
+
+        case "right":
+            console.log("moving right")
+            //check color of next cell
+            nextX = ant[Math.floor(ant.length/2)][0] -= cellW
+            next = getPixels(state[0].color[0])[4 * ( ant[Math.floor(ant.length/2)][1] * gl.drawingBufferWidth + nextX)]
+            console.log(next)
+            setDirection(dir, (next > 0))
+
+            for(i = 0; i < ant.length; i++){
+                ant[i][0] += cellW
+                poke(ant[i][0], ant[i][1], val, state[0].color[0])
             }
 
             break;
@@ -64,12 +126,12 @@ function nextPosition(dir){
 }
 
 //move the ant
-function moveAnt(){
+function moveAnt(gl){
     switch (action) {
         case 0:
             break;
         case 1:
-            nextPosition("up")
+            nextPosition(nextDir[0], gl)
             break;
     }
 }
@@ -101,6 +163,8 @@ function intAnt(h, w, size, tex) {
                 }
             }
         }
+        nextDir.push("left")
+    nextColor.push(255)
 }
 
 //
@@ -112,24 +176,23 @@ function int(gl, size){
     state[0] = fbo( gl, [width,height] )
     state[1] = fbo( gl, [width,height] )
 
-
-    cellH = height/size
-    cellW = width/size
+    cellH = Math.round(height/size)
+    cellW = Math.round(width/size)
 
     intAnt(height, width, size, state[0].color[0])
 
-    sim = createShader(gl, vert, frag)
+    sim = createShader(gl, vert, draw)
 
     initialized = true
-    console.log(getPixels(state[0].color[0]))
 }
 
 let current = 0
 function tick(gl){
-    const preState = state[current]
-    const curState = state[current ^= 1]
+    preState = state[current]
+    curState = state[current ^= 1]
+    console.log(gl.canvas)
 
-    moveAnt()
+    moveAnt(gl)
 
     curState.bind()
     sim.bind()
