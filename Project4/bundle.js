@@ -2046,21 +2046,78 @@ const glslify = require( 'glslify' )
 const toy     = require( 'gl-toy' )
 const fbo     = require( 'gl-fbo' )
 const createShader = require('gl-shader')
+const getPixels = require('gl-texture2d-pixels')
 
-const shader = glslify(["#ifdef GL_ES\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// below is the line that imports our noise function\n//#pragma glslify: snoise3 = require(glsl-noise/simplex/3d)\n\nuniform float time;\nuniform sampler2D state;\nuniform vec2 resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / resolution;\n\n  vec4 color = texture2D(state, gl_FragCoord.xy / resolution);\n\n  float x, y;\n  x = fract(uv.x*25.0);\n  y = fract(uv.y*25.0);\n\n  if(x > 0.9 || y > 0.9){\n    gl_FragColor = vec4(1.,1.,1.,1.);\n  } else {\n    gl_FragColor = vec4( color.r, color.g, color.b, 1. );\n  }\n}"])
+const frag = glslify(["#ifdef GL_ES\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// below is the line that imports our noise function\n//#pragma glslify: snoise3 = require(glsl-noise/simplex/3d)\n\nuniform float time;\nuniform sampler2D state;\nuniform vec2 resolution;\n\nvoid main() {\n  vec2 uv = gl_FragCoord.xy / resolution;\n\n  vec4 color = texture2D(state, gl_FragCoord.xy / resolution);\n\n  float x, y;\n  x = fract(uv.x*25.0);\n  y = fract(uv.y*25.0);\n\n  if(x > 0.9 || y > 0.9){\n    gl_FragColor = vec4(1.,1.,1.,1.);\n  } else {\n    gl_FragColor = vec4( color.r, color.g, color.b, 1. );\n  }\n}"]), vert = glslify(["#define GLSLIFY 1\nattribute vec2 a_position;\n\n    void main() {\n      gl_Position = vec4( a_position, 0., 1. );\n    }"]), draw = glslify(["#ifdef GL_ES\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\nuniform sampler2D uSampler;\nuniform vec2 resolution;\n\nvoid main() {\n  //gl_FragColor = vec4( texture2D( uSampler, gl_FragCoord.xy / resolution ).rgb, 1. );\n  vec2 uv = gl_FragCoord.xy / resolution;\n\n    vec4 color = texture2D(uSampler, gl_FragCoord.xy / resolution);\n\n    float x, y;\n    x = fract(uv.x*25.0);\n    y = fract(uv.y*25.0);\n\n    if(x > 0.9 || y > 0.9){\n      gl_FragColor = vec4(1.,1.,1.,1.);\n    } else {\n      gl_FragColor = vec4( color.r, color.g, color.b, 1. );\n    }\n}"])
 
-let initialized = false, height, width, cellH, cellW
+
+let initialized = false, height, width, cellH, cellW, sim = null
 
 const state = []
 
+const direction = ["up", "down", "left", "right"]
+
+let action = 1, ant = [], nextDir = []
+
 //Set color of current cell based on the current color and then set the direction to move in
-function setDirection(curDir, isWhite){}
+function setDirection(dir, isWhite){
+    if(isWhite){
+        switch (dir) {
+            case "up":
+                break;
+            case "down":
+                break;
+            case "left":
+                break;
+            case "right":
+                break;
+        }
+    }else{
+        switch (dir) {
+            case "up":
+                break;
+            case "down":
+                break;
+            case "left":
+                break;
+            case "right":
+                break;
+        }
+    }
+
+}
 
 //gives the new position of the ant
-function nextPosition(pos, dir){}
+function nextPosition(dir){
+    switch(dir){
+        case "up":
+            console.log("moving up")
+            //check color of next cell
+            nextY = ant[Math.floor(ant.length/2)][1] += cellH
+            next = getPixels(state[0].color[0])[ant[Math.floor(ant.length/2)][0]]
+
+            console.log(next)
+            for(i = 0; i < ant.length; i++){
+                ant[i][1] += cellH
+                poke(ant[i][0], ant[i][1], 255, state[0].color[0])
+                //console.log(toy.canvas.getContext('2d').getImageData(ant[i][0], ant[i][1], 1, 1).data)
+            }
+
+            break;
+    }
+
+}
 
 //move the ant
-
+function moveAnt(){
+    switch (action) {
+        case 0:
+            break;
+        case 1:
+            nextPosition("up")
+            break;
+    }
+}
 
 //
 function poke( x, y, value, texture ) {
@@ -2081,18 +2138,14 @@ function poke( x, y, value, texture ) {
 //int grid set up
 function intAnt(h, w, size, tex) {
     //set ant at mid; need to get mid of size
-    //for(l = 0; l < size; l++){
-    console.log(h,w)
         for( i = 0; i < w; i++ ) {
             for( j = 0; j < h; j++ ) {
                 if( ((Math.ceil(size/2)/size) > i/w && i/w > (Math.floor(size/2)/size)) && ((Math.ceil(size/2)/size) > j/h && j/h > (Math.floor(size/2)/size))) {
-                  //if((i/w)==(size/2)/size && (j/h)==(size/2)/size){
-                    console.log(i,j)
+                    ant.push([i,j])
                     poke( i, j, 255, tex )
                 }
             }
         }
-    //}
 }
 
 //
@@ -2102,28 +2155,54 @@ function int(gl, size){
     width = gl.drawingBufferWidth
 
     state[0] = fbo( gl, [width,height] )
+    state[1] = fbo( gl, [width,height] )
+
 
     cellH = height/size
     cellW = width/size
 
     intAnt(height, width, size, state[0].color[0])
+
+    sim = createShader(gl, vert, frag)
+
     initialized = true
+    console.log(getPixels(state[0].color[0]))
+}
+
+let current = 0
+function tick(gl){
+    const preState = state[current]
+    const curState = state[current ^= 1]
+
+    moveAnt()
+
+    curState.bind()
+    sim.bind()
+
+    sim.uniforms.resolution = [ gl.drawingBufferWidth, gl.drawingBufferHeight ]
+    sim.uniforms.state = preState.color[0].bind()
+
+    //sim.attribute.a_position.location = 0
 }
 
 let count = 0
-toy( shader, (gl, shader) => {
+toy( draw, (gl, shader) => {
     // this function runs once per frame
     if(!initialized){
         int(gl, 25)
     }
+    tick(gl)
 
-    //shader.bind()
+    shader.bind()
+
+    // restore default framebuffer binding after overriding in tick
+    gl.bindFramebuffer( gl.FRAMEBUFFER, null )
 
     shader.uniforms.resolution = [ gl.drawingBufferWidth, gl.drawingBufferHeight ]
-    shader.uniforms.state = state[ 0 ].color[0].bind()
+    shader.uniforms.uSampler = state[ 0 ].color[0].bind()
     shader.uniforms.time = count++
 })
-},{"gl-fbo":19,"gl-shader":21,"gl-toy":29,"glslify":42}],5:[function(require,module,exports){
+},{"gl-fbo":19,"gl-shader":21,"gl-texture2d-pixels":28,"gl-toy":30,"glslify":43}],5:[function(require,module,exports){
 'use strict'
 
 var weakMap      = typeof WeakMap === 'undefined' ? require('weak-map') : WeakMap
@@ -2154,7 +2233,7 @@ function createABigTriangle(gl) {
 
 module.exports = createABigTriangle
 
-},{"gl-buffer":15,"gl-vao":33,"weak-map":53}],6:[function(require,module,exports){
+},{"gl-buffer":15,"gl-vao":34,"weak-map":54}],6:[function(require,module,exports){
 var padLeft = require('pad-left')
 
 module.exports = addLineNumbers
@@ -2172,7 +2251,7 @@ function addLineNumbers (string, start, delim) {
   }).join('\n')
 }
 
-},{"pad-left":47}],7:[function(require,module,exports){
+},{"pad-left":48}],7:[function(require,module,exports){
 module.exports = function _atob(str) {
   return atob(str)
 }
@@ -2904,7 +2983,7 @@ function generateCWiseOp(proc, typesig) {
 }
 module.exports = generateCWiseOp
 
-},{"uniq":52}],12:[function(require,module,exports){
+},{"uniq":53}],12:[function(require,module,exports){
 "use strict"
 
 // The function below is called when constructing a cwise function object, and does the following:
@@ -3232,7 +3311,7 @@ function createBuffer(gl, data, type, usage) {
 
 module.exports = createBuffer
 
-},{"ndarray":46,"ndarray-ops":45,"typedarray-pool":51}],16:[function(require,module,exports){
+},{"ndarray":47,"ndarray-ops":46,"typedarray-pool":52}],16:[function(require,module,exports){
 module.exports = {
   0: 'NONE',
   1: 'ONE',
@@ -3572,7 +3651,7 @@ function createContext(canvas, opts, render) {
   }
 }
 
-},{"raf-component":48}],19:[function(require,module,exports){
+},{"raf-component":49}],19:[function(require,module,exports){
 'use strict'
 
 var createTexture = require('gl-texture2d')
@@ -4039,7 +4118,7 @@ function createFBO(gl, width, height, options) {
     WEBGL_draw_buffers)
 }
 
-},{"gl-texture2d":28}],20:[function(require,module,exports){
+},{"gl-texture2d":29}],20:[function(require,module,exports){
 
 var sprintf = require('sprintf-js').sprintf;
 var glConstants = require('gl-constants/lookup');
@@ -4094,7 +4173,7 @@ function formatCompilerError(errLog, src, type) {
 }
 
 
-},{"add-line-numbers":6,"gl-constants/lookup":17,"glsl-shader-name":34,"sprintf-js":50}],21:[function(require,module,exports){
+},{"add-line-numbers":6,"gl-constants/lookup":17,"glsl-shader-name":35,"sprintf-js":51}],21:[function(require,module,exports){
 'use strict'
 
 var createUniformWrapper   = require('./lib/create-uniforms')
@@ -5109,7 +5188,62 @@ function createProgram(gl, vref, fref, attribs, locations) {
   return getCache(gl).getProgram(vref, fref, attribs, locations)
 }
 
-},{"./GLError":22,"gl-format-compiler-error":20,"weakmap-shim":56}],28:[function(require,module,exports){
+},{"./GLError":22,"gl-format-compiler-error":20,"weakmap-shim":57}],28:[function(require,module,exports){
+var fbo;
+
+function dispose() {
+    this.gl.deleteFramebuffer(this.handle)
+}
+
+//Split into another module or use gl-fbo somehow
+function getPixels(texture, opts) {
+    var gl = texture.gl
+    if (!gl)
+        throw new Error("must provide gl-texture2d object with a valid 'gl' context")
+    
+    if (!fbo) {
+        var handle = gl.createFramebuffer()
+        fbo = {
+            handle: handle,
+            dispose: dispose,
+            gl: gl
+        }
+    } 
+
+    // make this the current frame buffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.handle)
+
+    // attach the texture to the framebuffer.
+    gl.framebufferTexture2D(
+        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D, texture.handle, 0)
+
+    // check if you can read from this type of texture.
+    var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
+    if (status !== gl.FRAMEBUFFER_COMPLETE) 
+        throw new Error("cannot read GL framebuffer: " + status)
+    
+    opts = opts||{}
+    opts.x = opts.x|0
+    opts.y = opts.y|0
+    opts.width = typeof opts.width === 'number' ? opts.width : (texture.shape[0]|0)
+    opts.height = typeof opts.height === 'number' ? opts.height : (texture.shape[1]|0)
+
+    var array = new Uint8Array(opts.width * opts.height * 4)
+    gl.readPixels(opts.x, opts.y, opts.width, opts.height, gl.RGBA, gl.UNSIGNED_BYTE, array)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return array
+}
+
+module.exports = getPixels
+
+module.exports.dispose = function() {
+    if (fbo) {
+        fbo.dispose()
+        fbo = undefined
+    }
+}
+},{}],29:[function(require,module,exports){
 'use strict'
 
 var ndarray = require('ndarray')
@@ -5672,7 +5806,7 @@ function createTexture2D(gl) {
   throw new Error('gl-texture2d: Invalid arguments for texture2d constructor')
 }
 
-},{"ndarray":46,"ndarray-ops":45,"typedarray-pool":51}],29:[function(require,module,exports){
+},{"ndarray":47,"ndarray-ops":46,"typedarray-pool":52}],30:[function(require,module,exports){
 'use strict';
 
 var triangle = require('a-big-triangle');
@@ -5715,7 +5849,7 @@ function toy(frag, cb) {
   }
 }
 
-},{"a-big-triangle":5,"canvas-fit":9,"gl-context":18,"gl-shader":21}],30:[function(require,module,exports){
+},{"a-big-triangle":5,"canvas-fit":9,"gl-context":18,"gl-shader":21}],31:[function(require,module,exports){
 "use strict"
 
 function doBind(gl, elements, attributes) {
@@ -5770,7 +5904,7 @@ function doBind(gl, elements, attributes) {
 }
 
 module.exports = doBind
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 "use strict"
 
 var bindAttribs = require("./do-bind.js")
@@ -5810,7 +5944,7 @@ function createVAOEmulated(gl) {
 }
 
 module.exports = createVAOEmulated
-},{"./do-bind.js":30}],32:[function(require,module,exports){
+},{"./do-bind.js":31}],33:[function(require,module,exports){
 "use strict"
 
 var bindAttribs = require("./do-bind.js")
@@ -5898,7 +6032,7 @@ function createVAONative(gl, ext) {
 }
 
 module.exports = createVAONative
-},{"./do-bind.js":30}],33:[function(require,module,exports){
+},{"./do-bind.js":31}],34:[function(require,module,exports){
 "use strict"
 
 var createVAONative = require("./lib/vao-native.js")
@@ -5927,7 +6061,7 @@ function createVAO(gl, attributes, elements, elementsType) {
 
 module.exports = createVAO
 
-},{"./lib/vao-emulated.js":31,"./lib/vao-native.js":32}],34:[function(require,module,exports){
+},{"./lib/vao-emulated.js":32,"./lib/vao-native.js":33}],35:[function(require,module,exports){
 var tokenize = require('glsl-tokenizer')
 var atob     = require('atob-lite')
 
@@ -5952,7 +6086,7 @@ function getName(src) {
   }
 }
 
-},{"atob-lite":7,"glsl-tokenizer":41}],35:[function(require,module,exports){
+},{"atob-lite":7,"glsl-tokenizer":42}],36:[function(require,module,exports){
 module.exports = tokenize
 
 var literals100 = require('./lib/literals')
@@ -6329,7 +6463,7 @@ function tokenize(opt) {
   }
 }
 
-},{"./lib/builtins":37,"./lib/builtins-300es":36,"./lib/literals":39,"./lib/literals-300es":38,"./lib/operators":40}],36:[function(require,module,exports){
+},{"./lib/builtins":38,"./lib/builtins-300es":37,"./lib/literals":40,"./lib/literals-300es":39,"./lib/operators":41}],37:[function(require,module,exports){
 // 300es builtins/reserved words that were previously valid in v100
 var v100 = require('./builtins')
 
@@ -6400,7 +6534,7 @@ module.exports = v100.concat([
   , 'textureProjGradOffset'
 ])
 
-},{"./builtins":37}],37:[function(require,module,exports){
+},{"./builtins":38}],38:[function(require,module,exports){
 module.exports = [
   // Keep this list sorted
   'abs'
@@ -6552,7 +6686,7 @@ module.exports = [
   , 'textureCubeGradEXT'
 ]
 
-},{}],38:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 var v100 = require('./literals')
 
 module.exports = v100.slice().concat([
@@ -6641,7 +6775,7 @@ module.exports = v100.slice().concat([
   , 'usampler2DMSArray'
 ])
 
-},{"./literals":39}],39:[function(require,module,exports){
+},{"./literals":40}],40:[function(require,module,exports){
 module.exports = [
   // current
     'precision'
@@ -6737,7 +6871,7 @@ module.exports = [
   , 'using'
 ]
 
-},{}],40:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 module.exports = [
     '<<='
   , '>>='
@@ -6786,7 +6920,7 @@ module.exports = [
   , '}'
 ]
 
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 var tokenize = require('./index')
 
 module.exports = tokenizeString
@@ -6801,7 +6935,7 @@ function tokenizeString(str, opt) {
   return tokens
 }
 
-},{"./index":35}],42:[function(require,module,exports){
+},{"./index":36}],43:[function(require,module,exports){
 module.exports = function(strings) {
   if (typeof strings === 'string') strings = [strings]
   var exprs = [].slice.call(arguments,1)
@@ -6813,7 +6947,7 @@ module.exports = function(strings) {
   return parts.join('')
 }
 
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 "use strict"
 
 function iota(n) {
@@ -6825,7 +6959,7 @@ function iota(n) {
 }
 
 module.exports = iota
-},{}],44:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -6848,7 +6982,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],45:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 "use strict"
 
 var compile = require("cwise-compiler")
@@ -7311,7 +7445,7 @@ exports.equals = compile({
 
 
 
-},{"cwise-compiler":10}],46:[function(require,module,exports){
+},{"cwise-compiler":10}],47:[function(require,module,exports){
 var iota = require("iota-array")
 var isBuffer = require("is-buffer")
 
@@ -7662,7 +7796,7 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
 
 module.exports = wrappedNDArrayCtor
 
-},{"iota-array":43,"is-buffer":44}],47:[function(require,module,exports){
+},{"iota-array":44,"is-buffer":45}],48:[function(require,module,exports){
 /*!
  * pad-left <https://github.com/jonschlinkert/pad-left>
  *
@@ -7678,7 +7812,7 @@ module.exports = function padLeft(str, num, ch) {
   ch = typeof ch !== 'undefined' ? (ch + '') : ' ';
   return repeat(ch, num) + str;
 };
-},{"repeat-string":49}],48:[function(require,module,exports){
+},{"repeat-string":50}],49:[function(require,module,exports){
 /**
  * Expose `requestAnimationFrame()`.
  */
@@ -7718,7 +7852,7 @@ exports.cancel = function(id){
   cancel.call(window, id);
 };
 
-},{}],49:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 /*!
  * repeat-string <https://github.com/jonschlinkert/repeat-string>
  *
@@ -7790,7 +7924,7 @@ function repeat(str, num) {
   return res;
 }
 
-},{}],50:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 /* global window, exports, define */
 
 !function() {
@@ -8023,7 +8157,7 @@ function repeat(str, num) {
     /* eslint-enable quote-props */
 }(); // eslint-disable-line
 
-},{}],51:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 (function (global){
 'use strict'
 
@@ -8278,7 +8412,7 @@ exports.clearCache = function clearCache() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"bit-twiddle":8,"buffer":2,"dup":13}],52:[function(require,module,exports){
+},{"bit-twiddle":8,"buffer":2,"dup":13}],53:[function(require,module,exports){
 "use strict"
 
 function unique_pred(list, compare) {
@@ -8337,7 +8471,7 @@ function unique(list, compare, sorted) {
 
 module.exports = unique
 
-},{}],53:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 // Copyright (C) 2011 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -9024,7 +9158,7 @@ module.exports = unique
   }
 })();
 
-},{}],54:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 var hiddenStore = require('./hidden-store.js');
 
 module.exports = createStore;
@@ -9045,7 +9179,7 @@ function createStore() {
     };
 }
 
-},{"./hidden-store.js":55}],55:[function(require,module,exports){
+},{"./hidden-store.js":56}],56:[function(require,module,exports){
 module.exports = hiddenStore;
 
 function hiddenStore(obj, key) {
@@ -9063,7 +9197,7 @@ function hiddenStore(obj, key) {
     return store;
 }
 
-},{}],56:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 // Original - @Gozola.
 // https://gist.github.com/Gozala/1269991
 // This is a reimplemented version (with a few bug fixes).
@@ -9094,4 +9228,4 @@ function weakMap() {
     }
 }
 
-},{"./create-store.js":54}]},{},[4]);
+},{"./create-store.js":55}]},{},[4]);
