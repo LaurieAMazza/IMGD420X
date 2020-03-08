@@ -9,4 +9,5 @@ Analog to Digital
 ## [Mini-Assignment 2/13](https://LaurieAMazza.github.io/IMGD420X/Class7.html)
 ## [Assignment 4](https://LaurieAMazza.github.io/IMGD420X/Assignment4.html)
 Simulation
-
+## [Final](https://LaurieAMazza.github.io/IMGD420X/Final.html)
+Final Project
