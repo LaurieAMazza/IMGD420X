@@ -6,7 +6,10 @@ My starting point of inspiration for this project came from the idea of being ab
 
 ### Output used for the simulation 
 Below are photos of the OSChook readings that were drivers over the time of the simulation.
-
+<img src="assets/Light.png" alt="hi" class="inline"/>
+<img src="assets/Rotation.png" alt="hi" class="inline"/>
+<img src="assets/Line.png" alt="hi" class="inline"/>
+<img src="assets/Grav.png" alt="hi" class="inline"/>
 
 ### Process
 I started this project by focusing on using a reading output from OSChook to drive a Reaction-Diffusion simulation. I began using the first value from the rotation vector to control the f value. This value required some cleanup as it can go into the negative values which, along with some other values, can end up killing the simulation. Testing and adjusting gave a result that allowed for control of the simulation without the risk of killing it. After this, I moved on to trying to have the color of the simulation be live video from the webcam. While I was able to get the video to work and have the input impact it in some way, I could not get it to work with the simulation in the way that I want it. After focusing on that issue for longer than I should have, I decided to change my plan and have another input from the phone to control the color of the simulation. In order to do this, I tested various outputs from OSChook and different ways of manipulating them into usable numbers. Based on these results, I decided to use the first three values of the rotation vector to control the RGB values. This allows the user to simply rotate the phone to change the color. Since the color was using the rotation vector, I decided to change what controlled the f value to avoid direct overlap and give the user the ability to control them more independently of each other. I went with the light value as putting the phone in the light made the simulation grow more, similar to putting a plant in the light. This value had to be adjusted for use as its raw value was unusable for the simulation. The last thing I added in was gravity controlling the direction of the blur to allow for it to be manipulated in some way. After receiving feedback, I decided to make changes which resulted in the testing of controlling the k value along with the f value and which outputs were controlling what. In the end, this resulted in the f value no longer being controlled and the k value being controlled by the x-axis linear acceleration. This allows for an increase in the rate by simply shaking the phone side to side. The light sensor is still utilized by having it control the amount of the blur.
@@ -15,7 +18,6 @@ I started this project by focusing on using a reading output from OSChook to dri
 [Repository](https://github.com/LaurieAMazza/IMGD420X-Final)
 
 ### Video of Simulation and Controller
-Having problems with this one. Will be up ASAP
 <iframe width="560" height="315" src="https://www.youtube.com/embed/zfptm2Ez5Lc" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ### Feedback
